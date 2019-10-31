@@ -10,6 +10,7 @@ import { Grid } from 'semantic-ui-react';
 class App extends Component {
   state = {
     shows: [],
+    resultsPage: 0,
     searchTerm: "",
     selectedShow: "",
     episodes: [],
@@ -17,36 +18,65 @@ class App extends Component {
   }
 
   componentDidMount = () => {
-    Adapter.getShows().then(shows => this.setState({shows}))
+    Adapter.getShows(this.state.resultsPage)
+      .then(shows => {
+        this.setState(previousState => {
+          return {
+            shows: shows,
+            resultsPage: previousState.resultsPage + 1
+          }
+        });
+      });
   }
 
   componentDidUpdate = () => {
-    window.scrollTo(0, 0)
+    // window.scrollTo(0, 0);
   }
 
-  handleSearch (e){
+  handleSearch = (e) => {
     this.setState({ searchTerm: e.target.value.toLowerCase() })
   }
 
   handleFilter = (e) => {
-    e.target.value === "No Filter" ? this.setState({ filterRating:"" }) : this.setState({ filterRating: e.target.value})
+    e.target.value === "No Filter" ? this.setState({ filterByRating:"" }) : this.setState({ filterByRating: e.target.value})
   }
 
+  handleScroll = () => {
+    const pageHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+    const scrollPosition = window.scrollY;
+
+    if (scrollPosition === pageHeight) {
+      Adapter.getShows(this.state.resultsPage)
+        .then(shows => {
+          this.setState(previousState => {
+            return {
+              shows: [...previousState.shows, ...shows],
+              resultsPage: previousState.resultsPage + 1
+            }
+          });
+        });
+    }
+  }
+  
   selectShow = (show) => {
     Adapter.getShowEpisodes(show.id)
     .then((episodes) => this.setState({
       selectedShow: show,
-      episodes
+      episodes: episodes
     }))
   }
 
   displayShows = () => {
-    if (this.state.filterByRating){
-      return this.state.shows.filter((s)=> {
-        return s.rating.average >= this.state.filterByRating
+    const shows = this.state.shows.filter(show => {
+      return show.name.toLowerCase().includes(this.state.searchTerm)
+    });
+
+    if (this.state.filterByRating !== "") {
+      return shows.filter((s)=> {
+        return s.rating.average >= Number(this.state.filterByRating)
       })
     } else {
-      return this.state.shows
+      return shows
     }
   }
 
@@ -59,7 +89,7 @@ class App extends Component {
             {!!this.state.selectedShow ? <SelectedShowContainer selectedShow={this.state.selectedShow} allEpisodes={this.state.episodes}/> : <div/>}
           </Grid.Column>
           <Grid.Column width={11}>
-            <TVShowList shows={this.displayShows()} selectShow={this.selectShow} searchTerm={this.state.searchTerm}/>
+            <TVShowList shows={this.displayShows()} selectShow={this.selectShow} searchTerm={this.state.searchTerm} handleScroll={this.handleScroll} />
           </Grid.Column>
         </Grid>
       </div>
